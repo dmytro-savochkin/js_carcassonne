@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+function playAudio() {
+	var a = new Audio();
+	a.src = "audio.wav"; 
+	a.play();
+}
+</script>
+</head>
+<body onload=" window.audio = document.getElementById('audio') ">
+
+<audio id="audio" preload="auto">
+	<source src="audio.wav"></source>             
+</audio> 
+
+<input type="button" onclick="playAudio()" value="play sound">
+
+</body>
+</html>

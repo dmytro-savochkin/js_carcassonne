@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">                                
+<title> Carcassonne </title>
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/buttons.css">
+<script src="js/jquery.js"></script>
+<script src="js/jquery-ui-1.8.6.js"></script>
+<script src="js/jquery.mousewheel.min.js"></script>
+<script src="js/jquery.cookies.js"></script>
+<script src="js/soundmanager/script/soundmanager2-nodebug-jsmin.js"></script>
+<script> 
+function extend(Child, Parent) {
+	var F = function() { };
+	F.prototype = Parent.prototype;
+	Child.prototype = new F();
+	Child.prototype.constructor = Child;
+	Child.superclass = Parent.prototype;
+}
+</script>
+<script src="lib/BrowserChecker.js"></script>
+<script src="lib/Me.js"></script>
+<script src="lib/Ajaxer.js"></script>
+<script src="lib/TimerOperator.js"></script>
+<script src="lib/GamesListParser.js"></script>
+<script src="lib/ImageManager.js"></script>
+<script src="lib/Game.js"></script>
+<script src="lib/MainData.js"></script>
+<script src="lib/Logger.js"></script>
+
+<script src="lib/Array.js"></script>
+<script src="lib/Math.js"></script>
+<script src="lib/Date.js"></script>
+
+<script src="lib/ResourseLoadingChecker.js"></script>
+<script src="lib/GameEnder.js"></script>
+<script src="lib/CanvasDrawer.js"></script>
+<script src="lib/MeeplesManager.js"></script>
+<script src="lib/GlobalZoneCombiner.js"></script>
+<script src="lib/Gamezone.js"></script>
+<script src="lib/Managezone.js"></script>
+
+<script src="lib/MoveMaker.js"></script>
+<script src="lib/PlayerManager.js"></script>
+<script src="lib/ZoneCreator.js"></script>
+<script src="lib/Field.js"></script>
+<script src="lib/TilesDataParser.js"></script>
+<script src="lib/Controller.js"></script>
+<script src="lib/MiniObjects.js"></script>
+<script src="lib/Sizer.js"></script>
+<script>
+soundManager.url = 'js/soundmanager/swf/';	
+soundManager.onready(function() {soundManager.loaded = true;});
+
+
+var mainData = new MainData();
+var browserOK = true; 
+
+    
+$(window).load(	
+	function() {
+		if(BrowserChecker.isNewBrowser()) {   
+			$('#browserError').hide();  
+		} else { 
+			$('#'+mainData.preloaderId).hide();
+			browserOK = false;	   
+		}
+	}
+);
+
+
+
+   
+
+
+
+
+var controller = new Controller();
+
+
+
+	
+$(window)	
+	.load(     
+		function() {    
+			if(browserOK) {
+				Sizer.setIdsForElements();
+				Sizer.setSizeOfPanels();
+				Sizer.moveCanvasToCenter();
+		
+				$('#'+mainData.canvasId).bind('contextmenu',function(e) {
+					if(e.button === 2) {   
+						e.preventDefault(); 
+						if(controller.game.getStatus() == controller.mainData.statuses.WAITING_FOR_TURN)
+							controller.rotateNextTile('right');
+						if(controller.game.getStatus() == controller.mainData.statuses.WAITING_FOR_MEEPLE)
+							controller.handleNextTileWindowMouseClick(); 
+					}
+				});
+			
+		        $('#'+mainData.canvasId).mousedown(function(e){
+		        	if(e.button === 0) {var nowData = new Date(); window.clickTime = nowData.getTime();}
+		        });
+		        $('#'+mainData.canvasId).mouseup(function(e){
+		        	if(e.button === 0) {
+			        	if(window.clickTime != undefined) {
+				        	var now = new Date();		
+				            if((now.getTime() - window.clickTime) < 300) {	
+				            	controller.handleCanvasMouseClick(e.clientX, e.clientY);	
+				            }
+				            window.clickTime = undefined;
+			            }
+		            }
+		        });
+	         
+	  
+				$('#'+mainData.canvasId).data("Left", $('#'+mainData.canvasId).css('left')).data("Top", $('#'+mainData.canvasId).css('top'));
+				$('#'+mainData.canvasId).draggable({ containment: "#gameField", scroll: false, cursor: 'pointer', delay: 100 });
+				$('#'+mainData.canvasId).css('cursor', 'pointer');
+	
+				$("#toCenter").css('cursor', 'pointer')
+					.click(function (e){ 
+						$('#'+mainData.canvasId).animate({
+				        	"left": $('#'+mainData.canvasId).data("Left"),
+				        	"top": $('#'+mainData.canvasId).data("Top")
+				        }, "slow");
+			 		});
+		 	
+			 	$("#testStructure").click(function(e){controller.testStructure();});
+			 	$("#restartGame").click(function(e){ if(window.confirm('Really restart?')) { controller.restartGame(); $("#toCenter").click(); } });
+		
+				$('#'+mainData.nextTileImgId).click(function(e){controller.handleNextTileWindowMouseClick(e.clientX, e.clientY);});
+		        $('#'+mainData.nextTileImgId).css('cursor', 'pointer');
+		
+				$("#plus").css('cursor', 'pointer').click(function (e){ if(controller.systemIsLoaded)controller.editScale("plus");});
+			    $("#minus").css('cursor', 'pointer').click(function (e){ if(controller.systemIsLoaded)controller.editScale("minus");});
+		
+				$('#'+mainData.canvasId)
+			        .bind('mousewheel', function(event, delta) {
+			            var dir = delta > 0 ? $("#plus").click() : $("#minus").click();
+			            return false;
+			        });
+		    
+				$('#'+mainData.tilesQueueId).html(mainData.tileQueueLength);
+			
+
+				var defaultName = $.cookie( 'playerName' );
+				if(defaultName == null)defaultName = mainData.defaultPlayerName;
+				$('#'+mainData.playerNameId)
+					.val(defaultName)
+					.focus(function(e){$('#'+mainData.playerNameId).css("color", "grey"); if(this.value == mainData.defaultPlayerName || this.value == mainData.provideYourName)this.value = "";})
+					.blur(function(e){if(this.value == "")this.value = mainData.defaultPlayerName;});
+
+			
+			    
+			
+			
+				function isNameValid(){
+					if($('#'+mainData.playerNameId).val() == mainData.defaultPlayerName || $('#'+mainData.playerNameId).val() == mainData.provideYourName) {
+						$('#'+mainData.playerNameId).val(mainData.provideYourName);
+						$('#'+mainData.playerNameId).css("color", "red");
+						return false;
+					}
+					return true;	
+				}
+				$('#createGame').click(function(e){ if(isNameValid()) controller.hostGame(); });
+				$('#joinGame').click(function(e){  
+					if($('#'+mainData.gamesSelectId).val() != null && isNameValid())
+						controller.joinGame();  
+				});  
+			
+			
+				$('#'+mainData.leaveGameButtonId).click(function(e){
+					controller.ajaxer.deletePlayer( controller.me.getId(), controller.gameId );
+					controller.timersOperator.stopAllTimers();
+		   			controller.quitGame();
+		   	 	});
+	   	 	
+		   	 	$('#'+mainData.startGameButtonId).click(function(e){
+					if(controller.me.iAmHost())
+						controller.hostStartGame();
+		   	 	});
+		   	 	
+		   	 	$('#sound').click(
+		   	 		function(e) {
+		   	 			controller.game.soundEnabled = $('#sound').prop('checked');
+		   	 		}
+		   	 	);
+		   	 	
+		   	 	controller.beginGameLoading();
+			}
+		}	
+	);	   
+	
+</script> 
+</head>
+<body>
+
+<div id="menu" class="bigNotifications">
+	<div id="menuInner">
+		<div id="menuTitle">
+			<h1>Carcassonne</h1>
+		</div>	
+		<div class="menuPoint" >
+			<input class="text" type="text" id="playerName" maxlength="15">
+		</div>		
+		<div class="menuPoint" >
+			<ul>
+				<li style="left:0;width:50%;">
+					<h5>
+						Create a new game<br> 
+					    (host mode)
+					</h5>
+					<div class="buttonDiv">
+						<input type="button" value="create" class="button button-gray menuButton" id="createGame">	
+					</div>
+				</li> 
+				<li style="right:0;width:50%;">
+					<h5>  
+						Join the game
+					</h5><br>
+					<select class="top" id="gamesSelect" style="margin:1px;"></select>
+					<div class="buttonDiv">
+						<input type="button" value="join" class="button button-gray menuButton" id="joinGame">	
+					</div>				
+				</li>
+			</ul>
+		</div>
+			
+	</div>
+</div>
+
+
+
+<div id="imagesError" class="bigNotifications">
+	<div class="preloaderInner">
+		<div class="imagesErrorPoint">
+		<h2>The error occured while trying to load game resourses.</h2>
+		</div> 
+		<div style="wmargin-top:4px;">
+		<h2>Please check later or reload this page (F5).</h2>
+		</div>	
+	</div>
+</div>
+
+
+
+<div id="browserError" class="bigNotifications">
+	<div class="preloaderInner">
+		<div class="imagesErrorPoint">
+		<h3>
+			Your browser doesn't support technologies used for this game.<br>
+			Please use modern browsers' versions.
+		</h3>
+		
+		<div class="menuPoint" >
+		<ul>
+			<li class="browsers">
+				<a href="http://www.google.com/chrome"><img src="img/browsers/chrome.png"></a>
+				<br><a href="http://www.google.com/chrome">Google Chrome</a>
+			</li>
+			<li class="browsers">
+				<a href="http://www.mozilla.org/"><img src="img/browsers/firefox.png"></a>
+				<br><a href="http://www.mozilla.org/">Mozilla Firefox</a>
+			</li>
+			<li class="browsers">
+				<a href="http://www.opera.com/browser/"><img src="img/browsers/opera.png" ></a>
+				<br><a href="http://www.opera.com/browser/" >Opera</a>
+			</li>
+			<li class="browsers">
+				<a href="http://www.apple.com/safari/download/"><img src="img/browsers/safari.png" ></a>
+				<br><a href="http://www.apple.com/safari/download/">Apple Safari</a>
+			</li>
+		</ul>
+		</div>
+   
+		
+		
+		</div>	
+	</div>
+</div>
+
+
+
+<div id="preloader" class="bigNotifications">
+	<div class="preloaderInner">
+		<img src="img/preloader.gif"><br>
+		<h3>The game is loading.</h3>
+	</div>
+</div>
+
+
+
+
+
+
+
+
+
+
+<div id="gameWindow">   
+	<div id="gameField">
+		<canvas id="gameCanvas" width="4000" height="4000"></canvas>		
+	</div> 
+	<div class="buttons" style="top:5px;">
+		<img id="toCenter" src="img/center.png"><br class="bigLineHeight">
+		<img id="plus" src="img/plus.png"><br> 
+	    <img id="minus" src="img/minus.png">
+	</div>
+</div>
+
+
+
+
+
+
+
+
+<div id="gameInfo">
+	<br>
+	<div id="nextTileInfo">
+		<span style="vertical-align: 25px">
+			<img src="img/left2.png" onmouseover="this.style.cursor='pointer'" onclick="javascript:controller.rotateNextTile('left');">
+		</span>
+		<canvas id="nextTileImg" width="86" height="86">
+		</canvas>
+		<span style="vertical-align: 25px">
+			<img src="img/right2.png" onmouseover="this.style.cursor='pointer'" onclick="javascript: controller.rotateNextTile('right');">
+		</span>
+		<div><h4><span id="tilesQueue"></span> in queue</h4></div>
+	</div>	   
+	
+	<br>
+	<div style="border:0px solid black;">
+		<input type="button" id="startGameButton" value="start game" disabled="disabled" style="height:22px;width:68px;">
+		<input type="button" id="leaveGameButton" value="leave game" disabled="disabled" style="height:22px;width:68px;">
+		<div style="height:22px; padding-top:2px; width: 55px; float:right">
+			<label>
+			<div style="float:left"><input type="checkbox" id="sound" checked></div> 
+			<div style="line-height:14px; font-size:14px; float:left">&nbsp;sound</div>
+			</label>
+		</div>
+	</div> 
+     
+    <div id="playersStats"></div>
+    
+    
+    <div style="position:absolute;bottom:10px;">
+    	<span id="testStructure" style="color:white;" onmouseover="this.style.cursor='pointer';"> - get structure data</span>
+    </div>     
+</div>
+
+
+
+
+<div id="logger">
+	<div id="loggerText"></div>
+</div>
+
+
+
+
+<audio id="audioSetTile" preload="auto">
+	<source src="audio/set.wav"></source>
+</audio> 
+
+<iframe id="iframe_tiles_structure" src="js/tiles_structure.html" style="display:none;"></iframe>
+</body>
+</html>
